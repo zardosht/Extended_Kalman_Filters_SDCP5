@@ -1,0 +1,9 @@
+*.md linguist-documentation
+*.html linguist-documentation
+*.htm linguist-documentation
+*.pdf linguist-documentation
+
+*.ipynb linguist-language=Python
+*.cpp linguist-language=C++
+*.hpp linguist-language=C++
+
