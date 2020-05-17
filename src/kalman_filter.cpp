@@ -66,6 +66,9 @@ Eigen::VectorXd KalmanFilter::radarMeasurementFunction(const VectorXd &predicted
 
   double rho = std::sqrt(std::pow(px, 2.0) + std::pow(py, 2.0));
   double phi = std::atan2(py, px);
+  if (fabs(rho) < 0.0001) {
+      rho = 0.0001;
+   }
   double rho_dot = (px * vx + py * vy) / rho;
 
   result << rho, phi, rho_dot;
