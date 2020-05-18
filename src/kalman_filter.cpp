@@ -48,6 +48,15 @@ void KalmanFilter::UpdateEKF(const VectorXd &z) {
    * TODO: update the state by using Extended Kalman Filter equations
    */
   VectorXd y = z - radarMeasurementFunction(x_);
+  // normalize the phi to be in interval (-pi, pi]
+  double *phi = &y[1];
+  while (*phi <= -M_PI) {
+    *phi += M_PI;
+  }
+  while (*phi > M_PI) {
+    *phi -= M_PI;
+  }
+
   MatrixXd S = H_ * P_ * H_.transpose() + R_;
   MatrixXd K = P_ * H_.transpose() * S.inverse();
   x_ = x_ + K * y;
