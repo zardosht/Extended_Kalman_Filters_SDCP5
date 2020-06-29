@@ -1,29 +1,73 @@
-# Extended Kalman Filter Project Starter Code
-Self-Driving Car Engineer Nanodegree Program
+#### Udacity Self-driving Car Nanodegree
+# Project 5: Extended Kalman Filter - Sensor Fusion 
 
-In this project you will utilize a kalman filter to estimate the state of a moving object of interest with noisy lidar and radar measurements. Passing the project requires obtaining RMSE values that are lower than the tolerance outlined in the project rubric. 
 
-This project involves the Term 2 Simulator which can be downloaded [here](https://github.com/udacity/self-driving-car-sim/releases).
 
-This repository includes two files that can be used to set up and install [uWebSocketIO](https://github.com/uWebSockets/uWebSockets) for either Linux or Mac systems. For windows you can use either Docker, VMware, or even [Windows 10 Bash on Ubuntu](https://www.howtogeek.com/249966/how-to-install-and-use-the-linux-bash-shell-on-windows-10/) to install uWebSocketIO. Please see the uWebSocketIO Starter Guide page in the classroom within the EKF Project lesson for the required version and installation scripts.
+## Overview
+In this project we use an Extended Kalman Filter (EKF) for estimating the state of a moving object from Lidar and Radar sensor measurements. The state vector is the 2D position and velocity of the car $X = (px, py, vx, vy)^T$ of the object. Following image shows an example result of the estimate: 
+
+![State Estimation using EKF](./readme_files/ekf_state_estimation.png)
+
+In the image above, the green triangles show the estimated state, the red circles are Lidar measurements $(m_px, m_py)$ and the blue circles show Radar measurements (range, bearing, and range rate) $(m_roh, m_phi, m_roh_dot)$ an arrow (inside blue circle) pointing in the direction of the observed bearing.
+
+Our goal is to use Kalman Filter (for Lidar measurement) and Extended Klaman Filter (for Radar measurement) to estimate the state (position and velocity), with RMSE less that a given upper bound and as low as possible. 
+
+The project uses [Udacity's Term 2 Simulator](https://github.com/udacity/self-driving-car-sim/releases) for generating the simulated measurements and presenting the result of EKF estimate. The simulator generates the sensor measurments data and ground truth with the following format: 
+
+* #L(for laser) meas_px meas_py timestamp gt_px gt_py gt_vx gt_vy
+* #R(for radar) meas_rho meas_phi meas_rho_dot timestamp gt_px gt_py gt_vx gt_vy
+
+The data is generated using a [matlab script]((https://github.com/udacity/CarND-Mercedes-SF-Utilities)) and an example data can be find in [this file](./data/obj_pose-laser-radar-synthetic-input.txt). 
+
+The simulator sends each line of measurement over a WebSocket connection to our code. The Extended Kalman Filter is implemented in the `FusionEKF` class. The `main()` method prepares a `measurement_package` from the input of the simulator (coming over the WebSocket) and calls `fusionEKF.ProcessMeasurement(meas_package)`. The RMSE is then calculated from the result of state estimation and the ground truth and the estimated state and the RMSE values for position and velocity are returned to the simulator for presentation. 
+
+The overall flow of the sensor fusion with KF and EKF is shown below: 
+
+![Overall control flow for Lidar/Radar sensor fusion using KF and EKF](./readme_files/overall_flow.png)
+
+If the incoming measurement is the very first one, the state vector is initialized. Other matrices are initialized in the constructor of the `FusionEKF` class: state transition function `F`, process covariance matrix `P`, measurement function `H` and measurement covariance matrix `R_laser` for Lidar measurements, and the measurement covariance matrix `R_radar` for radar measurements). The measurement function `h(x)` for Radar is nonlinear. So its Jacobian has be calculated for the EKF at each step. 
+
+For the consequent measurements the Prdict-Update cycle of the Kalman filter is performed: 
+
+* First at the Predict step, the $\Delta t$ time between the measurements are used to calculated teh new state transition function (`F`) and process covariance matrix (`Q`). We consider no control input ($u = 0$).
+
+
+* Then at the Measurement Update step for Radar the Jacobian of the radar measurement updated function is calculated and then  `UpdateEKF()` (extended Kalman filter) is called; or for Lidar measurements simply the `Update()` (Kalman filter) is called: 
+
+```cpp
+  if (measurement_pack.sensor_type_ == MeasurementPackage::RADAR) {
+    // Radar updates
+    ekf_.R_ = R_radar_;
+    ekf_.H_ = tools.CalculateJacobian(ekf_.x_);
+    ekf_.UpdateEKF(measurement_pack.raw_measurements_);
+
+  } else {
+    // Lidar updates
+    ekf_.R_ = R_laser_;
+    ekf_.H_ = H_laser_;
+    ekf_.Update(measurement_pack.raw_measurements_);
+  }
+```
+
+<!-- ![Kalman filter equations](./readme_files/kalman_filter_equations.jpg){height=200px width=200px} -->
+<img src="./readme_files/kalman_filter_equations.jpg" width=640 />
+
+## Setup and Build
+
+This repository includes two files that can be used to set up and install [uWebSocketIO](https://github.com/uWebSockets/uWebSockets) for either Linux or Mac systems.
 
 Once the install for uWebSocketIO is complete, the main program can be built and run by doing the following from the project top directory.
-
+```
 1. mkdir build
 2. cd build
 3. cmake ..
 4. make
 5. ./ExtendedKF
-
-Tips for setting up your environment can be found in the classroom lesson for this project.
-
-Note that the programs that need to be written to accomplish the project are src/FusionEKF.cpp, src/FusionEKF.h, kalman_filter.cpp, kalman_filter.h, tools.cpp, and tools.h
-
-The program main.cpp has already been filled out, but feel free to modify it.
+```
 
 Here is the main protocol that main.cpp uses for uWebSocketIO in communicating with the simulator.
 
-
+```
 **INPUT**: values provided by the simulator to the c++ program
 
 ["sensor_measurement"] => the measurement that the simulator observed (either lidar or radar)
@@ -42,93 +86,7 @@ Here is the main protocol that main.cpp uses for uWebSocketIO in communicating w
 ["rmse_vx"]
 
 ["rmse_vy"]
+```
 
----
-
-## Other Important Dependencies
-
-* cmake >= 3.5
-  * All OSes: [click here for installation instructions](https://cmake.org/install/)
-* make >= 4.1 (Linux, Mac), 3.81 (Windows)
-  * Linux: make is installed by default on most Linux distros
-  * Mac: [install Xcode command line tools to get make](https://developer.apple.com/xcode/features/)
-  * Windows: [Click here for installation instructions](http://gnuwin32.sourceforge.net/packages/make.htm)
-* gcc/g++ >= 5.4
-  * Linux: gcc / g++ is installed by default on most Linux distros
-  * Mac: same deal as make - [install Xcode command line tools](https://developer.apple.com/xcode/features/)
-  * Windows: recommend using [MinGW](http://www.mingw.org/)
-
-## Basic Build Instructions
-
-1. Clone this repo.
-2. Make a build directory: `mkdir build && cd build`
-3. Compile: `cmake .. && make` 
-   * On windows, you may need to run: `cmake .. -G "Unix Makefiles" && make`
-4. Run it: `./ExtendedKF `
-
-## Editor Settings
-
-We've purposefully kept editor configuration files out of this repo in order to
-keep it as simple and environment agnostic as possible. However, we recommend
-using the following settings:
-
-* indent using spaces
-* set tab width to 2 spaces (keeps the matrices in source code aligned)
-
-## Code Style
-
-Please (do your best to) stick to [Google's C++ style guide](https://google.github.io/styleguide/cppguide.html).
-
-## Generating Additional Data
-
-This is optional!
-
-If you'd like to generate your own radar and lidar data, see the
-[utilities repo](https://github.com/udacity/CarND-Mercedes-SF-Utilities) for
-Matlab scripts that can generate additional data.
-
-## Project Instructions and Rubric
-
-Note: regardless of the changes you make, your project must be buildable using
-cmake and make!
-
-More information is only accessible by people who are already enrolled in Term 2 (three-term version) or Term 1 (two-term version)
-of CarND. If you are enrolled, see the Project Resources page in the classroom
-for instructions and the project rubric.
-
-## Hints and Tips!
-
-* You don't have to follow this directory structure, but if you do, your work
-  will span all of the .cpp files here. Keep an eye out for TODOs.
-* Students have reported rapid expansion of log files when using the term 2 simulator.  This appears to be associated with not being connected to uWebSockets.  If this does occur,  please make sure you are conneted to uWebSockets. The following workaround may also be effective at preventing large log files.
-
-    + create an empty log file
-    + remove write permissions so that the simulator can't write to log
- * Please note that the ```Eigen``` library does not initialize ```VectorXd``` or ```MatrixXd``` objects with zeros upon creation.
-
-## Call for IDE Profiles Pull Requests
-
-Help your fellow students!
-
-We decided to create Makefiles with cmake to keep this project as platform
-agnostic as possible. Similarly, we omitted IDE profiles in order to ensure
-that students don't feel pressured to use one IDE or another.
-
-However! We'd love to help people get up and running with their IDEs of choice.
-If you've created a profile for an IDE that you think other students would
-appreciate, we'd love to have you add the requisite profile files and
-instructions to ide_profiles/. For example if you wanted to add a VS Code
-profile, you'd add:
-
-* /ide_profiles/vscode/.vscode
-* /ide_profiles/vscode/README.md
-
-The README should explain what the profile does, how to take advantage of it,
-and how to install it.
-
-Regardless of the IDE used, every submitted project must
-still be compilable with cmake and make.
-
-## How to write a README
-A well written README file can enhance your project and portfolio.  Develop your abilities to create professional README files by completing [this free course](https://www.udacity.com/course/writing-readmes--ud777).
+![Example run](./readme_files/ekf_screen_recording.gif)
 
